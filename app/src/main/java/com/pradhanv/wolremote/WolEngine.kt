@@ -71,8 +71,8 @@ object WolEngine {
                         sock.broadcast = true
                         sock.reuseAddress = true
                         val isV6 = addr is Inet6Address
-                        // For IPv4 hosts we also fire at the broadcast address if user left host as LAN IP
-                        val target = addr.hostAddress ?: continue
+                        val target = addr.hostAddress
+                        if (target == null) return@use
                         DatagramPacket(packetData, packetData.size, addr, port).let { sock.send(it) }
                         results.add(if (isV6) "IPv6 $target:$port" else "IPv4 $target:$port")
                     }
