@@ -57,11 +57,14 @@ object WolEngine {
             val port = pc.port
             val results = mutableListOf<String>()
 
-            // Resolve target - supports hostnames (DDNS), IPv4 dotted quads and full IPv6 literals
-            val addresses: List<InetAddress> = try {
-                InetAddress.getAllByName(pc.host.trim()).toList()
-            } catch (e: Exception) {
-                emptyList()
+            // Resolve ALL targets: primary host (DDNS/public IP/IPv6 literal) plus optional LAN IP.
+            // Supports hostnames (DDNS), IPv4 dotted quads and full IPv6 literals.
+            val hostNames = buildList {
+                add(pc.host.trim())
+                if (pc.hostLan.isNotBlank()) add(pc.hostLan.trim())
+            }
+            val addresses: List<InetAddress> = hostNames.flatMap { h ->
+                try { InetAddress.getAllByName(h).toList() } catch (_: Exception) { emptyList() }
             }
 
             // 1) Try each resolved address (covers both A and AAAA records of a DDNS name)
@@ -73,7 +76,12 @@ object WolEngine {
                         val isV6 = addr is Inet6Address
                         val target = addr.hostAddress
                         if (target == null) return@use
-                        DatagramPacket(packetData, packetData.size, addr, port).let { sock.send(it) }
+                        val pkt = DatagramPacket(packetData, packetData.size, addr, port)
+                        // send 3x with a short gap - survives single-datagram packet loss
+                        repeat(3) { n ->
+                            sock.send(pkt)
+                            if (n < 2) Thread.sleep(120)
+                        }
                         results.add(if (isV6) "IPv6 $target:$port" else "IPv4 $target:$port")
                     }
                 } catch (_: Exception) { /* try next */ }

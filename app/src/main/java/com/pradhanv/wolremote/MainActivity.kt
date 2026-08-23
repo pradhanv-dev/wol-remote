@@ -166,7 +166,7 @@ fun PcCard(pc: PcEntry, onWake: () -> Unit, onEdit: () -> Unit) {
             Column(Modifier.weight(1f)) {
                 Text(pc.name, color = TextMain, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
                 Spacer(Modifier.height(2.dp))
-                Text("${pc.host}:${pc.port}", color = TextSub, fontSize = 12.sp)
+                Text("${pc.host}:${pc.port}" + if (pc.hostLan.isNotBlank()) "  •  home: ${'$'}{pc.hostLan}" else "", color = TextSub, fontSize = 12.sp)
                 Text(
                     pc.mac.replace(":", "-").uppercase() + if (pc.secureOn.isNotBlank()) "  •  SecureOn" else "",
                     color = TextSub.copy(alpha = 0.7f), fontSize = 11.sp
@@ -189,6 +189,7 @@ fun PcEditor(initial: PcEntry?, onSave: (PcEntry) -> Unit, onDelete: (() -> Unit
     var mac by remember { mutableStateOf(initial?.mac ?: "") }
     var port by remember { mutableStateOf((initial?.port ?: 9).toString()) }
     var secureOn by remember { mutableStateOf(initial?.secureOn ?: "") }
+    var hostLan by remember { mutableStateOf(initial?.hostLan ?: "") }
     var useIpv6 by remember { mutableStateOf(initial?.useIpv6 ?: host.contains(":")) }
     var err by remember { mutableStateOf<String?>(null) }
 
@@ -212,6 +213,12 @@ fun PcEditor(initial: PcEntry?, onSave: (PcEntry) -> Unit, onDelete: (() -> Unit
                 }, label = { Text("Public IPv4, DDNS name, or global IPv6") }, singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
                     colors = fieldColors(), modifier = Modifier.fillMaxWidth())
+                OutlinedTextField(hostLan, { hostLan = it },
+                    label = { Text("Home LAN IP (optional, e.g. 192.168.29.50)") },
+                    supportingText = { Text("Tried alongside the main host so one tap works at home AND away", fontSize = 11.sp) },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Ascii),
+                    colors = fieldColors(), modifier = Modifier.fillMaxWidth())
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     OutlinedTextField(port, { port = it }, label = { Text("UDP port") }, singleLine = true,
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -232,7 +239,7 @@ fun PcEditor(initial: PcEntry?, onSave: (PcEntry) -> Unit, onDelete: (() -> Unit
                 if (WolEngine.parseMac(mac) == null) { err = "Invalid MAC address"; return@TextButton }
                 if (host.isBlank()) { err = "Host/IP required"; return@TextButton }
                 onSave(PcEntry(initial?.id ?: 0L, name.ifBlank { "PC" }, host.trim(), mac.trim(),
-                    port.toIntOrNull() ?: 9, secureOn.trim(), useIpv6))
+                    port.toIntOrNull() ?: 9, secureOn.trim(), hostLan.trim(), useIpv6))
             }) { Text("Save", color = Accent, fontWeight = FontWeight.Bold) }
         },
         dismissButton = {
