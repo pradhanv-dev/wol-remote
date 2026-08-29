@@ -101,7 +101,7 @@ fun AppRoot(store: PcStore) {
                             onWake = {
                                 scope.launch {
                                     when (val r = WolEngine.wake(pc)) {
-                                        is WolEngine.WakeResult.Success -> snack = "✓ Wake packet sent to ${pc.name} (${r.detail})"
+                                        is WolEngine.WakeResult.Success -> snack = "✓ Wake burst sent to ${pc.name} (${r.detail})"
                                         is WolEngine.WakeResult.Failure -> snack = "✗ ${r.message}"
                                     }
                                 }

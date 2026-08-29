@@ -4,6 +4,7 @@ import java.net.DatagramPacket
 import java.net.DatagramSocket
 import java.net.InetAddress
 import java.net.Inet6Address
+import kotlinx.coroutines.delay
 
 object WolEngine {
 
@@ -54,7 +55,7 @@ object WolEngine {
     suspend fun wake(pc: PcEntry): WakeResult = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
         try {
             val packetData = buildPacket(pc.mac, pc.secureOn.ifBlank { null })
-            val port = pc.port
+            val port = pc.port.coerceIn(1, 65535)
             val results = mutableListOf<String>()
 
             // Resolve ALL targets: primary host (DDNS/public IP/IPv6 literal) plus optional LAN IP.
@@ -63,12 +64,16 @@ object WolEngine {
                 add(pc.host.trim())
                 if (pc.hostLan.isNotBlank()) add(pc.hostLan.trim())
             }
-            val addresses: List<InetAddress> = hostNames.flatMap { h ->
+            val resolvedAddresses: List<InetAddress> = hostNames.flatMap { h ->
                 try { InetAddress.getAllByName(h).toList() } catch (_: Exception) { emptyList() }
             }
+            val orderedAddresses = resolvedAddresses
+                .distinctBy { it.hostAddress ?: it.toString() }
+                .sortedByDescending { addr -> (addr is Inet6Address) == pc.useIpv6 }
+            val wakePorts = listOf(port, 9, 7).distinct()
 
             // 1) Try each resolved address (covers both A and AAAA records of a DDNS name)
-            for (addr in addresses) {
+            for (addr in orderedAddresses) {
                 try {
                     DatagramSocket().use { sock ->
                         sock.broadcast = true
@@ -76,13 +81,15 @@ object WolEngine {
                         val isV6 = addr is Inet6Address
                         val target = addr.hostAddress
                         if (target == null) return@use
-                        val pkt = DatagramPacket(packetData, packetData.size, addr, port)
-                        // send 3x with a short gap - survives single-datagram packet loss
-                        repeat(3) { n ->
-                            sock.send(pkt)
-                            if (n < 2) Thread.sleep(120)
+                        for (targetPort in wakePorts) {
+                            val pkt = DatagramPacket(packetData, packetData.size, addr, targetPort)
+                            // Burst across ports to improve reliability with NIC/router port expectations.
+                            repeat(3) { n ->
+                                sock.send(pkt)
+                                if (n < 2) delay(120)
+                            }
                         }
-                        results.add(if (isV6) "IPv6 $target:$port" else "IPv4 $target:$port")
+                        results.add(if (isV6) "IPv6 $target (${wakePorts.joinToString("/")})" else "IPv4 $target (${wakePorts.joinToString("/")})")
                     }
                 } catch (_: Exception) { /* try next */ }
             }
@@ -94,8 +101,14 @@ object WolEngine {
                     DatagramSocket().use { sock ->
                         sock.broadcast = true
                         val bc = InetAddress.getByName("255.255.255.255")
-                        DatagramPacket(packetData, packetData.size, bc, port).let { sock.send(it) }
-                        results.add("broadcast 255.255.255.255:$port")
+                        for (targetPort in wakePorts) {
+                            val pkt = DatagramPacket(packetData, packetData.size, bc, targetPort)
+                            repeat(2) { n ->
+                                sock.send(pkt)
+                                if (n < 1) delay(120)
+                            }
+                        }
+                        results.add("broadcast 255.255.255.255 (${wakePorts.joinToString("/")})")
                     }
                 } catch (_: Exception) { /* ignore */ }
             }
