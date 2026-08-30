@@ -7,9 +7,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -101,7 +103,7 @@ fun AppRoot(store: PcStore) {
                             onWake = {
                                 scope.launch {
                                     when (val r = WolEngine.wake(pc)) {
-                                        is WolEngine.WakeResult.Success -> snack = "✓ Wake packet sent to ${pc.name} (${r.detail})"
+                                        is WolEngine.WakeResult.Success -> snack = "✓ Wake burst sent to ${pc.name} (${r.detail})"
                                         is WolEngine.WakeResult.Failure -> snack = "✗ ${r.message}"
                                     }
                                 }
@@ -126,6 +128,8 @@ fun AppRoot(store: PcStore) {
 
 @Composable
 fun EmptyState() {
+    var showSetup by remember { mutableStateOf(false) }
+    
     Column(
         Modifier.fillMaxSize().padding(32.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -139,11 +143,62 @@ fun EmptyState() {
         Text("No PCs yet", color = TextMain, fontWeight = FontWeight.Bold, fontSize = 18.sp)
         Spacer(Modifier.height(8.dp))
         Text(
-            "Tap “Add PC” to save your machine.\n\n" +
+            "Tap "Add PC" to save your machine.\n\n" +
             "• IPv4: forward a UDP port on your router, use public IP or DDNS name.\n" +
-            "• IPv6: paste your PC’s global IPv6 address — no port-forward needed.",
+            "• IPv6: paste your PC's global IPv6 address — no port-forward needed.",
             color = TextSub, fontSize = 13.sp, lineHeight = 19.sp
         )
+        Spacer(Modifier.height(24.dp))
+        Button(
+            onClick = { showSetup = true },
+            colors = ButtonDefaults.buttonColors(containerColor = Accent.copy(alpha = 0.2f), contentColor = Accent),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Text("📋 PC Setup Guide", fontWeight = FontWeight.SemiBold)
+        }
+    }
+    
+    if (showSetup) {
+        SetupChecklist(onDismiss = { showSetup = false })
+    }
+}
+
+@Composable
+fun SetupChecklist(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Surface1,
+        titleContentColor = TextMain,
+        textContentColor = TextSub,
+        shape = RoundedCornerShape(20.dp),
+        title = { Text("PC Setup Checklist") },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
+                Text("⚠️  WoL ONLY works if PC is in Sleep, Hibernate, or gracefully powered off — NOT after crash or hard power-off.", 
+                    color = Color(0xFFFF9800), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                
+                CheckItem("Enable WoL in BIOS/UEFI", "Restart → BIOS → Look for "Wake on LAN" or "WoL" → Enable → Save")
+                CheckItem("Enable in NIC Driver", "Device Manager → Network adapters → Right-click NIC → Properties → Advanced → "Wake on Magic Packet" → Enabled")
+                CheckItem("Allow wake in Power", "Power Settings → "Allow this device to wake the computer" → ✓ Checked")
+                CheckItem("Test on LAN first", "Put PC to sleep. From phone on same WiFi, try waking. If it works, external wake will work too.")
+                CheckItem("Configure app", "Add PC entry with correct MAC, IP/hostname, and port.")
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) { Text("Got it", color = Accent, fontWeight = FontWeight.Bold) }
+        }
+    )
+}
+
+@Composable
+fun CheckItem(title: String, detail: String) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text("✓ $title", color = TextMain, fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+        Spacer(Modifier.height(3.dp))
+        Text(detail, color = TextSub, fontSize = 11.sp, lineHeight = 15.sp)
     }
 }
 
