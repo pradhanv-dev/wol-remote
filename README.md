@@ -2,14 +2,38 @@
 
 Wake-on-LAN app for Android. Wake your PC from anywhere.
 
-## Critical: PC must be in the right power state
+## ⚠️ Critical Limitation: Force Shutdown Does NOT Work
 
-**WoL ONLY works if:**
-- ✅ PC is in **Sleep** (S3), **Hibernate** (S4), or **Soft Shutdown** (powered-off gracefully via OS)
-- ❌ **NOT** after a hard power-off (force shutdown, power button held, unplugged, or crash)
-- ❌ **NOT** if the power supply is fully disconnected
+**WoL ONLY works if PC is in:**
+- ✅ **Sleep** (S3) — NIC stays powered, recommended
+- ✅ **Hibernate** (S4) — NIC stays powered
+- ✅ **Soft Shutdown** (S5) — OS shut down normally, NIC still listening
+- ❌ **Force Shutdown** — NIC loses power, WoL impossible
+- ❌ **Hard power-off** (crash, power button held, unplugged)
 
-**If your PC is "turned off abruptly" or crashes, WoL cannot wake it.** The NIC loses power completely. This is a hardware/firmware limitation, not an app issue.
+**This is hardware-level, not fixable by the app.** The NIC must be powered to listen for packets.
+
+### Workarounds for Force Shutdown
+
+**Option 1: Use Sleep instead of Shutdown (Recommended)**
+- Press Win+X → **Sleep** instead of Shut Down
+- PC consumes ~10-15W vs ~2W in shutdown, but WoL works reliably
+- Best for most users
+
+**Option 2: Smart Power Plug** (for complete power-off + remote wake)
+- Add a networked smart plug (TP-Link Kasa, Shelly, LIFX, etc.)
+- Plug between wall outlet and PC power supply
+- Send command to app → plug power-cycles → PC boots
+- ⚠️ PC does a hard reboot (not graceful shutdown)
+- Future: this app can integrate Smart Plug control
+
+**Option 3: Low-Power Always-On Device** (Advanced)
+- Raspberry Pi or Arduino with relay connected to PC power button
+- Device stays powered, listens for commands
+- App sends command → device presses power button → PC wakes
+- Complex setup, overkill for most users
+
+---
 
 ## PC Setup (Required once)
 
@@ -36,6 +60,8 @@ Wake-on-LAN app for Android. Wake your PC from anywhere.
 1. Put PC to sleep (Win+X → Sleep).
 2. From another device on the same network, send a WoL packet to the PC's LAN IP.
 3. PC should wake. If not, go back and verify BIOS + driver settings.
+
+---
 
 ## How to wake from outside your home network
 
